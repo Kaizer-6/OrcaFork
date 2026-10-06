@@ -40,11 +40,13 @@ export const notificationsApi = {
   playSound: async (options?: {
     force?: boolean
     volume?: number
+    agentType?: string
   }): Promise<NotificationSoundResult> => {
     try {
-      const resolved = (await ipcRenderer.invoke(
-        'notifications:resolveSoundPath'
-      )) as NotificationSoundPathResult
+      const resolved: NotificationSoundPathResult = await ipcRenderer.invoke(
+        'notifications:resolveSoundPath',
+        options?.agentType
+      )
       if (!resolved.ok) {
         if (cachedNotificationSound) {
           disposeCachedNotificationSound()
@@ -54,9 +56,10 @@ export const notificationsApi = {
 
       let entry = cachedNotificationSound
       if (!entry || entry.path !== resolved.path) {
-        const sound = (await ipcRenderer.invoke(
-          'notifications:loadSound'
-        )) as NotificationSoundDataResult
+        const sound: NotificationSoundDataResult = await ipcRenderer.invoke(
+          'notifications:loadSound',
+          options?.agentType
+        )
         if (!sound.ok) {
           disposeCachedNotificationSound()
           return { played: false, reason: sound.reason }

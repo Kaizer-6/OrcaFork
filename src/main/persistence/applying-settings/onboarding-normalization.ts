@@ -6,6 +6,7 @@ import type {
 import type { NotificationSettings } from '../../../shared/notification-settings-types'
 import type { PersistedState } from '../../../shared/persisted-state-types'
 import { getDefaultNotificationSettings } from '../../../shared/notification-settings-defaults'
+import { normalizeAgentNotificationSoundPaths } from '../../../shared/notification-agent-sounds'
 import { normalizeVisibleExecutionHostIds } from '../../../shared/execution-host'
 import {
   getDefaultOnboardingState,
@@ -58,6 +59,7 @@ export function normalizeNotificationSettings(value: unknown): NotificationSetti
         ? candidate.customSoundPath
         : defaults.customSoundPath,
     customSoundVolume,
+    agentSoundPaths: normalizeAgentNotificationSoundPaths(candidate.agentSoundPaths),
     mutedNotificationSourceIds: normalizeMutedNotificationSourceIds(
       candidate.mutedNotificationSourceIds
     )
@@ -74,6 +76,17 @@ function normalizeMutedNotificationSourceIds(
 }
 
 function sameNotificationSettingValue(raw: unknown, normalized: unknown): boolean {
+  if (normalized && typeof normalized === 'object' && !Array.isArray(normalized)) {
+    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+      return false
+    }
+    const entries = Object.entries(normalized)
+    const rawEntries = new Map(Object.entries(raw))
+    return (
+      rawEntries.size === entries.length &&
+      entries.every(([key, value]) => rawEntries.has(key) && rawEntries.get(key) === value)
+    )
+  }
   if (Array.isArray(normalized)) {
     return (
       Array.isArray(raw) &&

@@ -11,6 +11,7 @@ import {
 import { NotificationSettingToggle } from './NotificationSettingToggle'
 import { NotificationHostToggles } from './NotificationHostToggles'
 import { NotificationSoundSection } from './NotificationSoundSection'
+import { AgentNotificationSoundSection } from './AgentNotificationSoundSection'
 import {
   createNotificationVolumeDraftState,
   resolveNotificationVolumeDraftState,
@@ -191,6 +192,12 @@ export function NotificationsPane({
         volumeDraft={volumeDraft}
         onVolumeDraftChange={setVolumeDraft}
         onVolumeCommit={handleVolumeCommit}
+        onUpdateNotificationSettings={updateNotificationSettings}
+      />
+
+      <AgentNotificationSoundSection
+        notificationSettings={notificationSettings}
+        volume={volumeDraft}
         onUpdateNotificationSettings={updateNotificationSettings}
       />
 

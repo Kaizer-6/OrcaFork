@@ -16,7 +16,7 @@ function buildAtomFeed(tags: string[]): string {
   const entries = tags
     .map(
       (tag) =>
-        `<entry><link rel="alternate" type="text/html" href="https://github.com/stablyai/orca/releases/tag/${tag}"/><title>${tag}</title></entry>`
+        `<entry><link rel="alternate" type="text/html" href="https://github.com/Kaizer-6/OrcaFork/releases/tag/${tag}"/><title>${tag}</title></entry>`
     )
     .join('')
   return `<?xml version="1.0" encoding="UTF-8"?><feed>${entries}</feed>`
@@ -43,7 +43,7 @@ function respondWithAtom(
   const missingAssets = new Set(missingAssetTags)
   const unavailableManifests = new Set(unavailableManifestTags)
   netFetchMock.mockImplementation((url: string, init?: { method?: string }) => {
-    if (url === 'https://github.com/stablyai/orca/releases.atom') {
+    if (url === 'https://github.com/Kaizer-6/OrcaFork/releases.atom') {
       return Promise.resolve({
         ok: true,
         text: () => Promise.resolve(buildAtomFeed(tags))
@@ -117,6 +117,25 @@ describe('fetchNewerReleaseTag', () => {
     expect(await fetchNewerReleaseTag('1.3.51', { includePrerelease: false })).toBe('v1.4.0')
   })
 
+  it('ignores official release links in a fork feed', async () => {
+    const feed = `${buildAtomFeed(['v1.4.1'])}<link href="https://github.com/stablyai/orca/releases/tag/v99.0.0"/>`
+    respondWithAtom(['v1.4.1'])
+    const original = netFetchMock.getMockImplementation()
+    netFetchMock.mockImplementation((url, init) =>
+      url.endsWith('/releases.atom')
+        ? Promise.resolve({ ok: true, text: async () => feed })
+        : original?.(url, init)
+    )
+    const { fetchNewerReleaseTag } = await import('./updater-prerelease-feed')
+    expect(await fetchNewerReleaseTag('1.4.0')).toBe('v1.4.1')
+  })
+
+  it('decodes fork build metadata from GitHub feed links', async () => {
+    respondWithAtom(['v1.4.215%2Bfork.1'])
+    const { fetchNewerReleaseTag } = await import('./updater-prerelease-feed')
+    expect(await fetchNewerReleaseTag('1.4.214+fork.1')).toBe('v1.4.215+fork.1')
+  })
+
   it.each([
     ['darwin', 'latest-mac.yml'],
     ['linux', 'latest-linux.yml'],
@@ -129,7 +148,7 @@ describe('fetchNewerReleaseTag', () => {
       const assetUrls: string[] = []
 
       netFetchMock.mockImplementation((url: string, init?: { method?: string }) => {
-        if (url === 'https://github.com/stablyai/orca/releases.atom') {
+        if (url === 'https://github.com/Kaizer-6/OrcaFork/releases.atom') {
           return Promise.resolve({
             ok: true,
             text: () => Promise.resolve(buildAtomFeed(['v1.4.1']))
@@ -157,10 +176,10 @@ describe('fetchNewerReleaseTag', () => {
 
       expect(await fetchNewerReleaseTag('1.4.0')).toBe('v1.4.1')
       expect(manifestUrls).toEqual([
-        `https://github.com/stablyai/orca/releases/download/v1.4.1/${manifestName}`
+        `https://github.com/Kaizer-6/OrcaFork/releases/download/v1.4.1/${manifestName}`
       ])
       expect(assetUrls).toEqual([
-        'https://github.com/stablyai/orca/releases/download/v1.4.1/Orca-1.4.1-arm64-mac.zip'
+        'https://github.com/Kaizer-6/OrcaFork/releases/download/v1.4.1/Orca-1.4.1-arm64-mac.zip'
       ])
       expect(netRequestMock).toHaveBeenCalledTimes(platform === 'win32' ? 1 : 0)
     }
@@ -365,7 +384,7 @@ describe('fetchNewerReleaseTag', () => {
     const manifestResolvers: (() => void)[] = []
 
     netFetchMock.mockImplementation((url: string) => {
-      if (url === 'https://github.com/stablyai/orca/releases.atom') {
+      if (url === 'https://github.com/Kaizer-6/OrcaFork/releases.atom') {
         return Promise.resolve({
           ok: true,
           text: () => Promise.resolve(buildAtomFeed(feedTags))

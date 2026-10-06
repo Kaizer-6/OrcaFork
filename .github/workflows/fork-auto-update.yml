@@ -1,0 +1,131 @@
+name: OrcaFork Updates
+
+on:
+  schedule:
+    - cron: '27 */6 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: orcafork-updates
+  cancel-in-progress: false
+
+jobs:
+  check:
+    if: github.repository == 'Kaizer-6/OrcaFork'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      needed: ${{ steps.plan.outputs.needed }}
+      upstream_tag: ${{ steps.plan.outputs.upstreamTag }}
+      version: ${{ steps.plan.outputs.version }}
+      tag: ${{ steps.plan.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: package.json
+      - name: Check for a new upstream stable release
+        id: plan
+        run: node config/scripts/fork-update-plan.mjs
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+  build:
+    needs: check
+    if: needs.check.outputs.needed == 'true'
+    runs-on: windows-2025
+    timeout-minutes: 90
+    permissions:
+      contents: write
+    env:
+      ORCA_BACKGROUND_LAUNCH: '1'
+      NODE_OPTIONS: --max-old-space-size=4096
+      GOMEMLIMIT: 3GiB
+      GOMAXPROCS: '2'
+      GOGC: '50'
+      UPSTREAM_TAG: ${{ needs.check.outputs.upstream_tag }}
+      FORK_TAG: ${{ needs.check.outputs.tag }}
+      FORK_VERSION: ${{ needs.check.outputs.version }}
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - name: Merge the upstream release into the fork build
+        run: |
+          $ErrorActionPreference = 'Stop'
+          git config user.name 'OrcaFork builds'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git fetch --no-tags --unshallow origin main
+          if ($LASTEXITCODE -ne 0) { throw 'Cannot fetch fork history.' }
+          git fetch --no-tags https://github.com/stablyai/orca.git "refs/tags/$env:UPSTREAM_TAG"
+          if ($LASTEXITCODE -ne 0) { throw 'Cannot fetch upstream release.' }
+          $upstreamCommit = git rev-parse FETCH_HEAD
+          "UPSTREAM_COMMIT=$upstreamCommit" >> $env:GITHUB_ENV
+          git merge --no-commit --no-ff FETCH_HEAD
+          if ($LASTEXITCODE -ne 0) { throw 'Upstream conflicts with the fork. No update will be published.' }
+          git restore --source=$env:GITHUB_SHA --staged --worktree -- .github
+          if ($LASTEXITCODE -ne 0) { throw 'Cannot retain the fork workflows.' }
+          git commit --allow-empty -m "Build OrcaFork for $env:UPSTREAM_TAG"
+          if ($LASTEXITCODE -ne 0) { throw 'Cannot record merged build.' }
+      - uses: pnpm/setup@v2
+        with:
+          install: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: package.json
+          cache: pnpm
+          cache-dependency-path: |
+            pnpm-lock.yaml
+            mobile/pnpm-lock.yaml
+      - name: Install desktop dependencies
+        run: pnpm install --frozen-lockfile
+      - uses: ./.github/actions/install-mobile-dependencies
+      - name: Check the sound feature and fork updater
+        run: node config/scripts/check-fork-release.mjs --source
+      - name: Typecheck main process
+        run: pnpm tc:node
+      - name: Typecheck renderer
+        run: pnpm tc:web
+      - name: Typecheck CLI
+        run: pnpm tc:cli
+      - name: Check changed code
+        run: pnpm run check:code-quality:changed
+        env:
+          ORCA_CODE_QUALITY_BASE: ${{ env.UPSTREAM_COMMIT }}
+      - name: Build Windows relay process-table addons
+        run: |
+          node config/scripts/build-windows-process-tree-relay-addon.mjs --arch=x64
+          if ($LASTEXITCODE -ne 0) { throw 'x64 relay addon failed.' }
+          node config/scripts/build-windows-process-tree-relay-addon.mjs --arch=arm64
+          if ($LASTEXITCODE -ne 0) { throw 'arm64 relay addon failed.' }
+      - name: Build the merged app
+        run: pnpm build:release
+        env:
+          ORCA_REQUIRE_RELAY_NATIVE_ADDONS: x64,arm64
+      - name: Prepare Electron native runtime
+        run: pnpm run ensure:electron-runtime
+      - name: Package the fork without publishing
+        run: pnpm exec electron-builder --config config/electron-builder.config.cjs --win --x64 --publish never
+      - name: Verify packaged update identity and manifest
+        run: node config/scripts/check-fork-release.mjs --package
+      - uses: actions/upload-artifact@v4
+        with:
+          name: orcafork-windows
+          retention-days: 3
+          path: |
+            dist/orca-windows-setup.exe
+            dist/orca-windows-setup.exe.blockmap
+            dist/latest.yml
+          if-no-files-found: error
+      - name: Publish the tested fork release
+        run: node config/scripts/publish-fork-release.mjs
+        env:
+          GH_TOKEN: ${{ github.token }}

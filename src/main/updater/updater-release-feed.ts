@@ -1,4 +1,5 @@
 import { app } from 'electron'
+import { LATEST_RELEASE_DOWNLOAD_URL } from '../../shared/release-channel'
 import {
   fetchNewerReleaseTagsWithReadiness,
   getReleaseDownloadUrl
@@ -208,7 +209,7 @@ export abstract class UpdaterReleaseFeed extends UpdaterInstallExecution {
     }
     this.clearPrereleaseFallbackContext()
     this.clearPublishingWindowLastGoodCheck()
-    const url = 'https://github.com/stablyai/orca/releases/latest/download'
+    const url = LATEST_RELEASE_DOWNLOAD_URL
     console.info(
       `[updater] release feed fallback: current=${currentVersion} includePrerelease=${includePrerelease} → ${url}`
     )

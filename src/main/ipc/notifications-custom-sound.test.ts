@@ -27,6 +27,7 @@ vi.mock('../tray/system-tray', async () =>
 )
 
 import { registerNotificationHandlers } from './notifications'
+import { getDefaultNotificationSettings } from '../../shared/notification-settings-defaults'
 
 describe('registerNotificationHandlers', () => {
   let tempDir: string
@@ -40,6 +41,62 @@ describe('registerNotificationHandlers', () => {
 
   afterEach(() => {
     rmSync(tempDir, { recursive: true, force: true })
+  })
+
+  it('loads different agent files and falls back to the default for unassigned agents', async () => {
+    const claude = join(tempDir, 'claude.wav')
+    const codex = join(tempDir, 'codex.mp3')
+    const fallback = join(tempDir, 'default.ogg')
+    writeFileSync(claude, Buffer.from([1]))
+    writeFileSync(codex, Buffer.from([2]))
+    writeFileSync(fallback, Buffer.from([3]))
+    const store = {
+      getSettings: () => ({
+        notifications: {
+          ...getDefaultNotificationSettings(),
+          suppressWhenFocused: false,
+          customSoundId: 'custom',
+          customSoundPath: fallback,
+          agentSoundPaths: { claude, codex }
+        }
+      })
+    }
+    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: Notification handlers read only getSettings from the store.
+    registerNotificationHandlers(store as never)
+    const load = getLoadSoundHandler()
+    expect(getResolveSoundPathHandler()({}, 'claude')).toEqual({ ok: true, path: claude })
+    await expect(load({}, 'claude')).resolves.toMatchObject({
+      data: new Uint8Array([1]),
+      mimeType: 'audio/wav'
+    })
+    await expect(load({}, 'codex')).resolves.toMatchObject({
+      data: new Uint8Array([2]),
+      mimeType: 'audio/mpeg'
+    })
+    await expect(load({}, 'pi')).resolves.toMatchObject({ data: new Uint8Array([3]) })
+    await expect(load({}, { path: claude })).resolves.toMatchObject({ data: new Uint8Array([3]) })
+  })
+
+  it('silences the system sound only for a completion with an agent override', async () => {
+    const store = {
+      getSettings: () => ({
+        notifications: {
+          ...getDefaultNotificationSettings(),
+          suppressWhenFocused: false,
+          agentSoundPaths: { claude: join(tempDir, 'claude.wav') }
+        }
+      })
+    }
+    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: Notification handlers read only getSettings from the store.
+    registerNotificationHandlers(store as never)
+    await getDispatchHandler()(
+      {},
+      { source: 'agent-task-complete', agentType: 'claude', agentState: 'done' }
+    )
+    expect(notificationCtorMock).toHaveBeenLastCalledWith(expect.objectContaining({ silent: true }))
+    notificationCtorMock.mockClear()
+    await getDispatchHandler()({}, { source: 'test', agentType: 'claude' })
+    expect(notificationCtorMock.mock.calls[0]?.[0]).not.toHaveProperty('silent')
   })
 
   it('uses the macOS default notification sound when no custom sound is configured', async () => {

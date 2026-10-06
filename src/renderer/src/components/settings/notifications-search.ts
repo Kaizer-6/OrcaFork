@@ -4,6 +4,14 @@ import { createLocalizedCatalog } from '@/i18n/localized-catalog'
 
 export const getNotificationsPaneSearchEntries = createLocalizedCatalog(() => [
   {
+    title: translate('settings.agentNotificationSounds.title', 'Agent Completion Sounds'),
+    description: translate(
+      'settings.agentNotificationSounds.description',
+      'Choose a sound file for each agent. Unassigned agents use the notification sound above.'
+    ),
+    keywords: ['agent', 'claude', 'codex', 'audio', 'sound', 'completion', 'custom']
+  },
+  {
     title: translate(
       'auto.components.settings.notifications.search.4a210b2f72',
       'Enable Notifications'

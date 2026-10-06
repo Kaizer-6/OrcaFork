@@ -1,6 +1,7 @@
 export async function playDesktopNotificationSound(
   customSoundId: string | null | undefined,
-  customSoundVolume?: number | null
+  customSoundVolume?: number | null,
+  agentType?: string
 ): Promise<boolean> {
   if (!customSoundId || customSoundId === 'system') {
     return false
@@ -8,7 +9,8 @@ export async function playDesktopNotificationSound(
 
   try {
     const result = await window.api.notifications.playSound({
-      volume: customSoundVolume ?? undefined
+      volume: customSoundVolume ?? undefined,
+      ...(agentType ? { agentType } : {})
     })
     // Why: 'deduped' is expected when bursts of notifications coalesce — not a failure.
     if (!result.played && result.reason !== 'deduped') {

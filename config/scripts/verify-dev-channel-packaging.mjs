@@ -12,13 +12,17 @@
 // building. Runs before packaging, fails with a sentence someone can act on.
 
 import { createRequire } from 'node:module'
+import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 
+const forkRelease = JSON.parse(
+  readFileSync(new URL('../../src/shared/fork-release-config.json', import.meta.url), 'utf8')
+)
 const CHANNEL_REPOS = {
-  hourly: 'orca-hourly',
-  daily: 'orca-daily',
-  adhoc: 'orca-adhoc'
+  hourly: `${forkRelease.repo}-hourly`,
+  daily: `${forkRelease.repo}-daily`,
+  adhoc: `${forkRelease.repo}-adhoc`
 }
 
 const CHANNEL_VERSION_ENV = {

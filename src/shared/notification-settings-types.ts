@@ -21,6 +21,8 @@ export type NotificationSettings = {
     | 'custom'
   customSoundPath: string | null
   customSoundVolume: number
+  /** Completion sound files on this desktop, keyed by agent type. */
+  agentSoundPaths?: Record<string, string>
   /** Desktop opt-outs stored only on this client, per configured source and work reached through it; new sources notify. */
   mutedNotificationSourceIds: NotificationSourceId[]
 }

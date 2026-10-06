@@ -1,16 +1,18 @@
 import { net } from 'electron'
 import { parse } from 'yaml'
 import { compareVersions, isPrereleaseVersion, isValidVersion } from './updater-fallback'
+import { MAIN_RELEASE_URL } from '../shared/release-channel'
 
-const ATOM_FEED_URL = 'https://github.com/stablyai/orca/releases.atom'
-const RELEASES_DOWNLOAD_BASE = 'https://github.com/stablyai/orca/releases/download'
+const ATOM_FEED_URL = `${MAIN_RELEASE_URL}/releases.atom`
+const RELEASES_DOWNLOAD_BASE = `${MAIN_RELEASE_URL}/releases/download`
 const FETCH_TIMEOUT_MS = 5000
 const MAX_MANIFEST_PROBE_CANDIDATES = 6
 
 // Why: GitHub's atom feed lists every release (prerelease or stable) in a
 // single flat list. Each entry has a /releases/tag/<tag> URL we can mine
 // without any channel filtering.
-const TAG_HREF_RE = /href="https:\/\/github\.com\/stablyai\/orca\/releases\/tag\/([^"]+)"/g
+const TAG_HREF_RE = /href="([^"]+)"/g
+const RELEASE_TAG_PREFIX = `${MAIN_RELEASE_URL}/releases/tag/`
 
 export function getReleaseDownloadUrl(tag: string): string {
   return `${RELEASES_DOWNLOAD_BASE}/${encodeURIComponent(tag)}`
@@ -65,7 +67,10 @@ async function fetchReleaseFeedTags(): Promise<ReleaseFeedTag[] | null> {
     const tags: ReleaseFeedTag[] = []
 
     for (const match of body.matchAll(TAG_HREF_RE)) {
-      const tag = match[1]
+      if (!match[1].startsWith(RELEASE_TAG_PREFIX)) {
+        continue
+      }
+      const tag = decodeURIComponent(match[1].slice(RELEASE_TAG_PREFIX.length))
       const version = normalizeTagToVersion(tag)
       if (isValidVersion(version)) {
         tags.push({ tag, version })
@@ -153,7 +158,7 @@ async function getReleaseAssetReadiness(tag: string, assetName: string): Promise
   const isGitHubReleaseAsset =
     process.platform === 'win32' &&
     (isRelativeAsset ||
-      /^https:\/\/github\.com\/stablyai\/orca\/releases\/download\//i.test(assetName))
+      assetName.toLowerCase().startsWith(`${RELEASES_DOWNLOAD_BASE}/`.toLowerCase()))
   const assetUrl = isRelativeAsset
     ? getReleaseAssetUrl(tag, assetName.split('/').findLast(Boolean) ?? assetName)
     : assetName

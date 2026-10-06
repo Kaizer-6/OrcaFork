@@ -57,6 +57,8 @@ describe('NotificationsPane', () => {
     )
 
     expect(html).toContain('Notification Sound')
+    expect(html).toContain('Agent Completion Sounds')
+    expect(html).toContain('notification-sound-agent')
     expect(getNotificationSoundOptions(null).map((option) => option.title)).toEqual(
       expect.arrayContaining(['System Default', 'Two Tone', 'Bong', 'Ding'])
     )

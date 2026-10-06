@@ -24,7 +24,8 @@ export function deliverNativeNotification(
   notificationOptions: ReturnType<typeof buildNotificationOptions>,
   settings: NotificationSettings
 ): NotificationDispatchResult | Promise<NotificationDispatchResult> {
-  if (getEffectiveNotificationSoundId(settings) !== 'system') {
+  const agentType = args.source === 'agent-task-complete' ? args.agentType : undefined
+  if (getEffectiveNotificationSoundId(settings, agentType) !== 'system') {
     notificationOptions.silent = true
   } else if (process.platform === 'darwin') {
     // Why: macOS treats an unset sound as silent, so request Electron's default when using the OS sound.

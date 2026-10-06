@@ -6,6 +6,22 @@ import {
 import { getDefaultNotificationSettings } from '../../../shared/notification-settings-defaults'
 
 describe('muted notification machines', () => {
+  it('persists agent sound paths without rewriting valid settings on every load', () => {
+    const persisted = {
+      ...getDefaultNotificationSettings(),
+      agentSoundPaths: { claude: '/sounds/claude.wav', codex: '/sounds/codex.mp3' }
+    }
+    const normalized = normalizeNotificationSettings(persisted)
+    expect(normalized.agentSoundPaths).toEqual(persisted.agentSoundPaths)
+    expect(persistedNotificationSettingsRepaired(persisted, normalized)).toBe(false)
+    expect(
+      normalizeNotificationSettings({
+        agentSoundPaths: { claude: 42, codex: '', pi: '/sounds/pi.wav' }
+      }).agentSoundPaths
+    ).toEqual({ pi: '/sounds/pi.wav' })
+    expect(normalizeNotificationSettings({ agentSoundPaths: ['bad'] }).agentSoundPaths).toEqual({})
+    expect(normalizeNotificationSettings({}).agentSoundPaths).toEqual({})
+  })
   it('keeps valid machine ids once and drops anything else', () => {
     const normalized = normalizeNotificationSettings({
       mutedNotificationSourceIds: [

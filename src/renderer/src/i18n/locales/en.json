@@ -176,6 +176,15 @@
     "retrying": "Retrying…"
   },
   "settings": {
+    "agentNotificationSounds": {
+      "title": "Agent Completion Sounds",
+      "description": "Choose a sound file for each agent. Unassigned agents use the notification sound above.",
+      "default": "Using default notification sound",
+      "preview": "Preview",
+      "reset": "Use Default",
+      "formats": "MP3, WAV, OGG, M4A, AAC or FLAC, up to 10 MB. Uses the notification volume and focus settings.",
+      "error": "Could not update or play the agent sound."
+    },
     "chat": {
       "description": "Choose how chats look."
     },

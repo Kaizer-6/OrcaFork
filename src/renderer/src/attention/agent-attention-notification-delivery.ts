@@ -13,10 +13,12 @@
 import { playDesktopNotificationSound } from '@/lib/desktop-notification-sound'
 import { showBlockedNotificationFallbackToast } from '@/lib/blocked-notification-fallback'
 import type { NotificationDispatchRequest } from '../../../shared/notification-settings-types'
+import { getAgentNotificationSoundPath } from '../../../shared/notification-agent-sounds'
 
 export type AgentAttentionNotificationSound = {
   customSoundId: string
   customSoundVolume: number | null
+  agentSoundPaths?: Record<string, string>
 }
 
 export function deliverAgentAttentionNotification(
@@ -27,7 +29,11 @@ export function deliverAgentAttentionNotification(
     .dispatch(request)
     .then((result) => {
       if (result.delivered) {
-        void playDesktopNotificationSound(sound.customSoundId, sound.customSoundVolume)
+        const agentType = request.source === 'agent-task-complete' ? request.agentType : undefined
+        const soundId = getAgentNotificationSoundPath(sound, agentType)
+          ? 'custom'
+          : sound.customSoundId
+        void playDesktopNotificationSound(soundId, sound.customSoundVolume, agentType)
         return
       }
       // Why: macOS is silently swallowing notifications (permission off or prompt unanswered) —
@@ -43,10 +49,19 @@ export function deliverAgentAttentionNotification(
 
 /** The sound preferences one delivery reads, defaulted the way the dispatch path always has. */
 export function readAgentAttentionNotificationSound(settings: {
-  notifications?: { customSoundId?: string; customSoundVolume?: number | null } | undefined
+  notifications?:
+    | {
+        customSoundId?: string
+        customSoundVolume?: number | null
+        agentSoundPaths?: Record<string, string>
+      }
+    | undefined
 }): AgentAttentionNotificationSound {
   return {
     customSoundId: settings.notifications?.customSoundId ?? 'system',
-    customSoundVolume: settings.notifications?.customSoundVolume ?? null
+    customSoundVolume: settings.notifications?.customSoundVolume ?? null,
+    ...(settings.notifications?.agentSoundPaths
+      ? { agentSoundPaths: settings.notifications.agentSoundPaths }
+      : {})
   }
 }

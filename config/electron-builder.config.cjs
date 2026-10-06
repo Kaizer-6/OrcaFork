@@ -1,6 +1,8 @@
 const { chmodSync, existsSync, readdirSync, readFileSync, writeFileSync } = require('node:fs')
 const { execFileSync } = require('node:child_process')
 const { join, resolve } = require('node:path')
+const forkRelease = require('../src/shared/fork-release-config.json')
+const forkPackageVersion = `${require('../package.json').version}+fork.${forkRelease.revision}`
 const electronBuilderNativeRebuild = require('./scripts/electron-builder-native-rebuild.cjs')
 const {
   assertPackagedDaemonEntryExists,
@@ -54,6 +56,7 @@ const isWinHourly = process.env.ORCA_WIN_HOURLY === '1'
 const isWinDaily = process.env.ORCA_WIN_DAILY === '1'
 const isWinAdhoc = process.env.ORCA_WIN_ADHOC === '1'
 const isWinDevChannel = isWinHourly || isWinDaily || isWinAdhoc
+const isUnsignedWindowsBuild = isWinDevChannel || forkRelease.unsignedWindowsUpdates
 const isMacRelease = process.env.ORCA_MAC_RELEASE === '1' || isMacHourly || isMacDaily || isMacAdhoc
 const isLinuxArm64Release = process.env.ORCA_LINUX_ARM64_RELEASE === '1'
 const localBuildVersion =
@@ -75,11 +78,11 @@ const devChannelBuildVersion = isHourlyChannel
 // or a once-a-day cut cannot be picked up by someone who only meant to ride
 // main's hourlies.
 const devChannelRepo = isHourlyChannel
-  ? 'orca-hourly'
+  ? `${forkRelease.repo}-hourly`
   : isDailyChannel
-    ? 'orca-daily'
+    ? `${forkRelease.repo}-daily`
     : isAdhocChannel
-      ? 'orca-adhoc'
+      ? `${forkRelease.repo}-adhoc`
       : null
 const appId = 'com.stablyai.orca'
 const featureWallResources = {
@@ -189,7 +192,7 @@ module.exports = {
     ? { extraMetadata: { version: devChannelBuildVersion } }
     : localBuildVersion
       ? { extraMetadata: { version: localBuildVersion } }
-      : {}),
+      : { extraMetadata: { version: forkPackageVersion } }),
   directories: {
     buildResources: 'resources/build'
   },
@@ -198,6 +201,7 @@ module.exports = {
     // Why: these repo-only inputs are either bundled into out/ or copied via
     // extraResources. Shipping them in app.asar bloats the desktop bundle.
     '!src{,/**/*}',
+    '!.build{,/**/*}',
     '!out/orcad{,/**/*}',
     // Never in app.asar: the template ships via orcadTemplateExtraResource; prebuilds are build inputs.
     '!out/orcad-*{,/**/*}',
@@ -456,6 +460,7 @@ module.exports = {
     // Why: Windows installers are signed after electron-builder packaging by
     // SignPath, so the packager cannot infer the updater publisherName.
     //
+    // Fork builds use the same unsigned policy as dev channels.
     // Why dev channels drop it instead: they ship unsigned, because SignPath's
     // approval waits are budgeted in hours and cannot fit an hourly cadence.
     // electron-updater Authenticode-verifies every installer it downloads
@@ -472,9 +477,9 @@ module.exports = {
     // its existing channel split above.
     signtoolOptions: {
       sign: signWindowsUninstallerViaSignPath,
-      ...(isWinDevChannel ? {} : { publisherName: 'SignPath Foundation' })
+      ...(isUnsignedWindowsBuild ? {} : { publisherName: 'SignPath Foundation' })
     },
-    ...(isWinDevChannel ? { verifyUpdateCodeSignature: false } : {}),
+    ...(isUnsignedWindowsBuild ? { verifyUpdateCodeSignature: false } : {}),
     extraResources: [
       ...commonExtraResources,
       ...windowsRuntimeResources,
@@ -712,8 +717,8 @@ module.exports = {
   npmRebuild: true,
   publish: {
     provider: 'github',
-    owner: 'stablyai',
-    repo: devChannelRepo ?? 'orca',
+    owner: forkRelease.owner,
+    repo: devChannelRepo ?? forkRelease.repo,
     // Why draft on the main repo: `--publish always` otherwise creates a
     // public GitHub release as soon as the first platform uploads, and
     // /releases/latest serves a missing Windows exe. release-cut undrafts

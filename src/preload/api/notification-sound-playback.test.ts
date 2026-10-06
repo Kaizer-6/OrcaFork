@@ -56,6 +56,16 @@ describe('notificationsApi.playSound', () => {
 
   afterEach(() => vi.unstubAllGlobals())
 
+  it('forwards the agent identity to both sound resolution and loading', async () => {
+    const api = await loadNotificationsApi()
+    await expect(api.playSound({ agentType: 'codex', volume: 25 })).resolves.toEqual({
+      played: true
+    })
+    expect(invoke).toHaveBeenCalledWith('notifications:resolveSoundPath', 'codex')
+    expect(invoke).toHaveBeenCalledWith('notifications:loadSound', 'codex')
+    expect(construct.mock.calls[0]?.[0].volume).toBe(0.25)
+  })
+
   it('replays the cached sound for each notification instead of deduping mid-playback', async () => {
     const notificationsApi = await loadNotificationsApi()
 

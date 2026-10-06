@@ -163,7 +163,8 @@ export function NotificationSoundSection({
           {notificationSettings.customSoundPath}
         </p>
       ) : null}
-      {selectedSoundId !== 'system' ? (
+      {selectedSoundId !== 'system' ||
+      Object.keys(notificationSettings.agentSoundPaths ?? {}).length > 0 ? (
         <div className="flex items-center gap-3 pt-1">
           <Volume2 className="size-4 text-muted-foreground" />
           <Slider
